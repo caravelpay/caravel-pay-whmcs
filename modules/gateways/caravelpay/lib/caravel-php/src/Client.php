@@ -22,7 +22,7 @@ use CaravelPay\Http\TransportInterface;
  */
 final class Client
 {
-    public const VERSION = '1.2.1';
+    public const VERSION = '1.2.2';
     public const DEFAULT_API_BASE = 'https://api.caravelpay.app';
     public const MERCHANT_ID_PATTERN = '/^[A-Za-z0-9_-]{1,64}$/D';
 

@@ -38,6 +38,9 @@ final class Checkout
     public const RATE_PATTERN = '/^[0-9]{1,9}\.[0-9]{1,18}$/D';
     private const TIME = '/^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,3})?Z$/D';
     private const TX_HASH = '/^0x[0-9a-fA-F]{64}$/D';
+    private const ASSET = '/^[A-Za-z][A-Za-z0-9.]{0,15}$/D';
+    /** Ethereum payout assets (every other payout asset is on Polygon). */
+    public const ETHEREUM_ASSETS = ['PYUSD', 'USDT', 'ETH'];
 
     /**
      * Validate a checkout object. Unknown fields are kept, so newer API fields pass through.
@@ -171,10 +174,31 @@ final class Checkout
         return isset($checkout['payout']) && is_array($checkout['payout']) ? [$checkout['payout']] : [];
     }
 
-    /** A Polygonscan link for a transaction hash, or ''. */
-    public static function explorerUrl(?string $txHash, string $prefix = 'https://polygonscan.com/tx/'): string
+    /**
+     * Block-explorer link for a payout transaction hash, or ''.
+     * Defaults to Etherscan for Ethereum payout assets (PYUSD, USDT, ETH) and Polygonscan otherwise.
+     * Pass $prefix to override the explorer base URL (or pass an asset ticker when $asset is omitted).
+     */
+    public static function explorerUrl(?string $txHash, ?string $prefix = null, ?string $asset = null): string
     {
-        return null !== $txHash && preg_match(self::TX_HASH, $txHash) ? $prefix . strtolower($txHash) : '';
+        if (null === $txHash || !preg_match(self::TX_HASH, $txHash)) {
+            return '';
+        }
+        if (null !== $prefix && '' !== $prefix) {
+            if ((null === $asset || '' === $asset) && preg_match(self::ASSET, trim($prefix))) {
+                $asset = $prefix;
+                $prefix = null;
+            }
+        } else {
+            $prefix = null;
+        }
+        if (null === $prefix) {
+            $normalized = null !== $asset ? strtoupper(trim($asset)) : '';
+            $prefix = in_array($normalized, self::ETHEREUM_ASSETS, true)
+                ? 'https://etherscan.io/tx/'
+                : 'https://polygonscan.com/tx/';
+        }
+        return $prefix . strtolower($txHash);
     }
 
     /**

@@ -647,7 +647,8 @@ final class Gateway
         $parts = [];
         foreach (Checkout::payouts($checkout) as $payout) {
             $hash = strtolower((string) $payout['tx_hash']);
-            $parts[] = $payout['amount'] . ' ' . $payout['asset'] . ', tx ' . $hash . ' (' . Checkout::explorerUrl($hash) . ')';
+            $asset = isset($payout['asset']) && is_string($payout['asset']) ? $payout['asset'] : null;
+            $parts[] = $payout['amount'] . ' ' . $payout['asset'] . ', tx ' . $hash . ' (' . Checkout::explorerUrl($hash, null, $asset) . ')';
         }
         return $parts ? 'Payout: ' . implode('; ', $parts) . '.' : '';
     }

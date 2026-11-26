@@ -14,7 +14,7 @@ use CaravelPay\Kit\PdoStorage;
  */
 final class Module
 {
-    const VERSION = '1.2.1';
+    const VERSION = '1.2.2';
     const GATEWAY = 'caravelpay';
     const TABLE_PREFIX = 'mod_caravelpay_';
     const PAYGATE_GATEWAYS = array('paygatedottohosted', 'paygatedottocustom');
@@ -104,6 +104,10 @@ final class Module
         if (null === $invoice || Invoice::UNPAID !== $invoice->status) {
             return '';
         }
+        // When WHMCS converts an invoice via Convert To For Processing, only USD is supported as the target currency.
+        if (Currency::USD !== $currency && $currency !== Currency::code($invoice->nativeCurrency)) {
+            return '<p class="caravelpay-note">' . self::e('This invoice\'s currency can\'t be paid with Caravel Pay.') . '</p>';
+        }
         $amount = WhmcsLedger::money(isset($params['amount']) ? $params['amount'] : '0');
         $gateway = self::gateway($params);
         // A US dollar form is signed exactly as before; another currency is part of what is signed.
@@ -157,6 +161,10 @@ final class Module
         $invoice = $ledger->invoice($invoiceId);
         if (null === $invoice) {
             return self::page(404, 'This invoice was not found.', $back);
+        }
+        // Reject non-USD Convert To For Processing targets rather than silently charging a mismatched currency/amount.
+        if (Currency::USD !== $currency && $currency !== Currency::code($invoice->nativeCurrency)) {
+            return self::page(400, 'This invoice\'s currency can\'t be paid with Caravel Pay.', $back);
         }
         if (Invoice::UNPAID === $invoice->status && $invoice->nativeAmount !== $native) {
             // The balance changed since the page was shown (a partial payment, an edit): show the fresh amount.
@@ -281,13 +289,17 @@ final class Module
     /** Connection status for the settings page. Never shows the secret. */
     private static function statusHtml(): string
     {
-        $lines = array('Your Polygon address (0x…). Every payout is sent here, minus the 2% Caravel fee. Saving connects WHMCS to Caravel Pay; a new wallet gets new API keys.');
+        $lines = array('Your Polygon address (0x…). Every payout is sent here, minus the 2% Caravel fee. WHMCS connects to Caravel Pay automatically on the first invoice payment; a new wallet gets new API keys.');
         try {
             $vars = function_exists('getGatewayVariables') ? getGatewayVariables(self::GATEWAY) : array();
+            $wallet = is_array($vars) && isset($vars['payoutAddress']) ? trim((string) $vars['payoutAddress']) : '';
+            if ('' !== $wallet && (!preg_match('/^0x[0-9a-fA-F]{40}$/D', $wallet) || preg_match('/^0x0{40}$/iD', $wallet))) {
+                $lines[] = '<strong style="color:#b91c1c">Invalid payout wallet:</strong> ' . self::e('Enter your Polygon payout wallet: 0x followed by 40 hexadecimal characters.');
+            }
             $summary = self::gateway(is_array($vars) ? $vars : array('systemurl' => ''))->summary();
             if ($summary['connected']) {
                 $lines[] = '<strong>Connected</strong> as ' . self::e($summary['merchant_id']) . ' for ' . self::e($summary['payout_address'])
-                    . ($summary['matches'] ? '.' : '. The wallet or System URL changed: the module connects again on the next save or payment.');
+                    . ($summary['matches'] ? '.' : '. The wallet or System URL changed: the module connects again on the next payment.');
             } else {
                 $lines[] = '<strong>Not connected yet.</strong>';
             }

@@ -197,7 +197,7 @@ class SqlStorage implements Storage
         $tables = [
             "CREATE TABLE IF NOT EXISTS {$p}credentials (merchant_id VARCHAR(64) NOT NULL PRIMARY KEY, secret TEXT NOT NULL, payout_address VARCHAR(42) NOT NULL, site_url VARCHAR(2048) NOT NULL, status VARCHAR(16) NOT NULL, created_at BIGINT NOT NULL, retired_at BIGINT NULL)",
             "CREATE TABLE IF NOT EXISTS {$p}invoices (invoice_ref VARCHAR(64) NOT NULL PRIMARY KEY, salt VARCHAR(16) NOT NULL, attempt INT NOT NULL, current_checkout VARCHAR(140) NULL, pending TEXT NULL, updated_at BIGINT NOT NULL)",
-            "CREATE TABLE IF NOT EXISTS {$p}checkouts (checkout_id VARCHAR(140) NOT NULL PRIMARY KEY, invoice_ref VARCHAR(64) NOT NULL, merchant_id VARCHAR(64) NOT NULL, order_id VARCHAR(128) NOT NULL, amount VARCHAR(20) NOT NULL, native_amount VARCHAR(20) NOT NULL, native_currency VARCHAR(8) NOT NULL, checkout_url VARCHAR(2048) NOT NULL, expires_at BIGINT NOT NULL, status VARCHAR(20) NOT NULL, paid_amount VARCHAR(20) NOT NULL, applied INT NOT NULL, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL)",
+            "CREATE TABLE IF NOT EXISTS {$p}checkouts (checkout_id VARCHAR(140) NOT NULL PRIMARY KEY, invoice_ref VARCHAR(64) NOT NULL, merchant_id VARCHAR(64) NOT NULL, order_id VARCHAR(128) NOT NULL, amount VARCHAR(20) NOT NULL, native_amount VARCHAR(20) NOT NULL, native_currency VARCHAR(8) NOT NULL, checkout_url VARCHAR(2048) NOT NULL, expires_at BIGINT NOT NULL, status VARCHAR(20) NOT NULL, paid_amount VARCHAR(20) NOT NULL, applied INT NOT NULL, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL" . ($mysql ? ", INDEX {$p}checkouts_invoice (invoice_ref)" : '') . ")",
             "CREATE TABLE IF NOT EXISTS {$p}events (event_id VARCHAR(140) NOT NULL PRIMARY KEY, at BIGINT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS {$p}settings (name VARCHAR(64) NOT NULL PRIMARY KEY, value TEXT NOT NULL)",
             "CREATE TABLE IF NOT EXISTS {$p}locks (name VARCHAR(140) NOT NULL PRIMARY KEY, token VARCHAR(64) NOT NULL, expires BIGINT NOT NULL)",
@@ -205,9 +205,8 @@ class SqlStorage implements Storage
         foreach ($tables as $sql) {
             $this->exec($sql . $suffix);
         }
-        $index = $mysql ? "CREATE INDEX {$p}checkouts_invoice ON {$p}checkouts (invoice_ref)" : "CREATE INDEX IF NOT EXISTS {$p}checkouts_invoice ON {$p}checkouts (invoice_ref)";
-        if (!$mysql || null === $this->one("SHOW INDEX FROM {$p}checkouts WHERE Key_name = ?", ["{$p}checkouts_invoice"])) {
-            $this->exec($index);
+        if (!$mysql) {
+            $this->exec("CREATE INDEX IF NOT EXISTS {$p}checkouts_invoice ON {$p}checkouts (invoice_ref)");
         }
     }
 
